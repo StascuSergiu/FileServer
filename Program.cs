@@ -79,6 +79,31 @@ app.MapPost("/api/files", (UploadRequest request, IFileStorageService storage, I
 })
 .WithName("UploadFile");
 
+// Upload file endpoint (multipart form)
+app.MapPost("/api/files/upload", async (IFormFile file, IFileStorageService storage, IOptions<FileCleanupSettings> options) =>
+{
+    if (file is null || file.Length == 0)
+    {
+        return Results.BadRequest(new ErrorResponse("No file provided."));
+    }
+
+    // Check file size
+    var maxSizeBytes = options.Value.MaxFileSizeMB * 1024 * 1024;
+    if (file.Length > maxSizeBytes)
+    {
+        return Results.BadRequest(new ErrorResponse($"File size exceeds maximum allowed size of {options.Value.MaxFileSizeMB} MB."));
+    }
+
+    using var memoryStream = new MemoryStream();
+    await file.CopyToAsync(memoryStream);
+    var content = memoryStream.ToArray();
+
+    var id = storage.Store(content);
+    return Results.Created($"/api/files/{id}", new UploadResponse(id));
+})
+.WithName("UploadFileForm")
+.DisableAntiforgery();
+
 // Download endpoint
 app.MapGet("/api/files/{id:guid}", (Guid id, IFileStorageService storage) =>
 {
