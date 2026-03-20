@@ -77,7 +77,9 @@ app.MapPost("/api/files", (UploadRequest request, IFileStorageService storage, I
     var id = storage.Store(content);
     return Results.Created($"/api/files/{id}", new UploadResponse(id));
 })
-.WithName("UploadFile");
+.WithName("UploadFile")
+.WithSummary("Upload file as Base64")
+.WithDescription("Upload a file by sending its content as a Base64-encoded string. Returns a GUID identifier for the uploaded file.");
 
 // Upload file endpoint (multipart form)
 app.MapPost("/api/files/upload", async (IFormFile file, IFileStorageService storage, IOptions<FileCleanupSettings> options) =>
@@ -102,6 +104,8 @@ app.MapPost("/api/files/upload", async (IFormFile file, IFileStorageService stor
     return Results.Created($"/api/files/{id}", new UploadResponse(id));
 })
 .WithName("UploadFileForm")
+.WithSummary("Upload file (multipart form)")
+.WithDescription("Upload a file using multipart/form-data. Send the file in the 'file' field. Returns a GUID identifier for the uploaded file.")
 .DisableAntiforgery();
 
 // Download endpoint
@@ -118,7 +122,9 @@ app.MapGet("/api/files/{id:guid}", (Guid id, IFileStorageService storage) =>
         contentType: "application/octet-stream",
         fileDownloadName: id.ToString());
 })
-.WithName("DownloadFile");
+.WithName("DownloadFile")
+.WithSummary("Download file by ID")
+.WithDescription("Download a file by its GUID identifier. Returns the file as application/octet-stream with Content-Disposition header for automatic download.");
 
 // Stats endpoint
 app.MapGet("/api/files/stats", (IFileStorageService storage) =>
@@ -127,7 +133,33 @@ app.MapGet("/api/files/stats", (IFileStorageService storage) =>
     var totalSizeMB = Math.Round(totalSizeBytes / (1024.0 * 1024.0), 2);
     return Results.Ok(new StatsResponse(totalFiles, totalSizeBytes, totalSizeMB));
 })
-.WithName("GetStats");
+.WithName("GetStats")
+.WithSummary("Get storage statistics")
+.WithDescription("Returns the total number of files stored and total memory usage in bytes and megabytes.");
+
+// List files endpoint
+app.MapGet("/api/files/list", (IFileStorageService storage, IOptions<FileCleanupSettings> options) =>
+{
+    var expirationMinutes = options.Value.DeleteOlderThanMinutes;
+    var timezoneOffset = TimeSpan.FromHours(options.Value.TimezoneOffsetHours);
+    var files = storage.GetAll().Select(f =>
+    {
+        var ageMinutes = (int)(DateTime.UtcNow - f.CreatedAtUtc).TotalMinutes;
+        var timeUntilExpiration = Math.Max(0, expirationMinutes - ageMinutes);
+        var fileSizeMB = Math.Round(f.Content.Length / (1024.0 * 1024.0), 4);
+        var createdAt = f.CreatedAtUtc + timezoneOffset;
+        return new FileInfoResponse(
+            f.Id,
+            createdAt,
+            timeUntilExpiration,
+            fileSizeMB);
+    }).ToList();
+    
+    return Results.Ok(files);
+})
+.WithName("ListFiles")
+.WithSummary("List all files")
+.WithDescription("Returns a list of all stored files with their ID, creation date, time until expiration, and file size.");
 
 app.Run();
 

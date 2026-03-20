@@ -10,6 +10,7 @@ A simple in-memory file server built with ASP.NET Core for uploading and downloa
 | `POST` | `/api/files` | Upload a file as Base64 |
 | `POST` | `/api/files/upload` | Upload a file (multipart form) |
 | `GET` | `/api/files/{id}` | Download a file by GUID |
+| `GET` | `/api/files/list` | List all files with details |
 | `GET` | `/api/files/stats` | Get memory usage statistics |
 | `GET` | `/swagger` | Swagger UI (API documentation) |
 | `GET` | `/hangfire` | Hangfire dashboard (public) |
@@ -35,6 +36,19 @@ A simple in-memory file server built with ASP.NET Core for uploading and downloa
 ### Stats
 - **Response**: `{ "totalFiles": 42, "totalSizeBytes": 15728640, "totalSizeMB": 15.0 }`
 
+### List Files
+- **Response**: Array of file info objects
+```json
+[
+  {
+    "fileId": "guid",
+    "createdAt": "2026-03-20T12:30:00",
+    "timeUntilExpirationMinutes": 25,
+    "fileSizeMB": 0.0125
+  }
+]
+```
+
 ### Core Functionality
 - **Storage**: In-memory database (non-persistent)
 - **Public API**: No authentication required
@@ -49,6 +63,7 @@ A simple in-memory file server built with ASP.NET Core for uploading and downloa
 - Cleanup interval (`x` minutes)
 - File expiration time (`y` minutes)
 - Maximum file size threshold
+- Timezone offset (hours, e.g., `-2`, `0`, `+3`)
 
 ### Error Handling
 - **File not found**: Returns `404` with descriptive message
@@ -75,6 +90,11 @@ dotnet run
 docker build -t fileserver .
 docker run -p 8080:8080 fileserver
 ```
+
+## Links (when running locally on port 8080)
+
+- **Swagger UI**: http://localhost:8080/swagger
+- **Hangfire Dashboard**: http://localhost:8080/hangfire
 
 ## Notes
 
