@@ -18,3 +18,4 @@ ENV DOTNET_GCHighMemPercent=50
 EXPOSE 8080
 
 ENTRYPOINT ["dotnet", "FileServer.dll"]
+
