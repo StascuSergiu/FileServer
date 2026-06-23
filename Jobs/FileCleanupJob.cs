@@ -25,9 +25,20 @@ public class FileCleanupJob
         var age = TimeSpan.FromMinutes(_settings.DeleteOlderThanMinutes);
         var deletedCount = _fileStorage.DeleteOlderThan(age);
         
-        _logger.LogInformation(
-            "File cleanup completed. Deleted {Count} files older than {Minutes} minutes.",
-            deletedCount,
-            _settings.DeleteOlderThanMinutes);
+        if (deletedCount > 0)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            
+            _logger.LogInformation(
+                "File cleanup completed. Deleted {Count} files older than {Minutes} minutes. Memory reclaimed.",
+                deletedCount,
+                _settings.DeleteOlderThanMinutes);
+        }
+        else
+        {
+            _logger.LogInformation("File cleanup completed. No files to delete.");
+        }
     }
 }

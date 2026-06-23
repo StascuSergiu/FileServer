@@ -63,12 +63,14 @@ A simple in-memory file server built with ASP.NET Core for uploading and downloa
 - Cleanup interval (`x` minutes)
 - File expiration time (`y` minutes)
 - Maximum file size threshold
+- Maximum total storage size threshold
 - Timezone offset (hours, e.g., `-2`, `0`, `+3`)
 
 ### Error Handling
 - **File not found**: Returns `404` with descriptive message
 - **Invalid Base64**: Returns `400` with descriptive message
 - **File too large**: Returns `400` if size exceeds configured threshold
+- **Storage full**: Returns `507 Insufficient Storage` if total storage exceeds threshold
 
 ### Deployment
 - Docker support included

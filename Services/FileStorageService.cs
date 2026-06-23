@@ -8,6 +8,7 @@ public interface IFileStorageService
     Guid Store(byte[] content);
     FileEntry? Get(Guid id);
     IEnumerable<FileEntry> GetAll();
+    bool Delete(Guid id);
     int DeleteOlderThan(TimeSpan age);
     (int totalFiles, long totalSizeBytes) GetStats();
 }
@@ -37,6 +38,11 @@ public class InMemoryFileStorageService : IFileStorageService
     public IEnumerable<FileEntry> GetAll()
     {
         return _files.Values.ToList();
+    }
+
+    public bool Delete(Guid id)
+    {
+        return _files.TryRemove(id, out _);
     }
 
     public int DeleteOlderThan(TimeSpan age)

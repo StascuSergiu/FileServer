@@ -20,9 +20,15 @@ builder.Services.AddHangfire(config => config
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
-    .UseInMemoryStorage());
+    .UseInMemoryStorage(new InMemoryStorageOptions
+    {
+        MaxExpirationTime = TimeSpan.FromMinutes(5)
+    }));
 
-builder.Services.AddHangfireServer();
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = 1;
+});
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -74,6 +80,17 @@ app.MapPost("/api/files", (UploadRequest request, IFileStorageService storage, I
         return Results.BadRequest(new ErrorResponse($"File size exceeds maximum allowed size of {options.Value.MaxFileSizeMB} MB."));
     }
 
+    // Check total storage
+    var (_, totalSizeBytes) = storage.GetStats();
+    var maxTotalStorageBytes = (long)options.Value.MaxTotalStorageMB * 1024 * 1024;
+    if (totalSizeBytes + content.Length > maxTotalStorageBytes)
+    {
+        var usedMB = Math.Round(totalSizeBytes / (1024.0 * 1024.0), 2);
+        return Results.Json(
+            new ErrorResponse($"Insufficient storage. Used: {usedMB} MB, Limit: {options.Value.MaxTotalStorageMB} MB."),
+            statusCode: StatusCodes.Status507InsufficientStorage);
+    }
+
     var id = storage.Store(content);
     return Results.Created($"/api/files/{id}", new UploadResponse(id));
 })
@@ -94,6 +111,17 @@ app.MapPost("/api/files/upload", async (IFormFile file, IFileStorageService stor
     if (file.Length > maxSizeBytes)
     {
         return Results.BadRequest(new ErrorResponse($"File size exceeds maximum allowed size of {options.Value.MaxFileSizeMB} MB."));
+    }
+
+    // Check total storage
+    var (_, totalSizeBytes) = storage.GetStats();
+    var maxTotalStorageBytes = (long)options.Value.MaxTotalStorageMB * 1024 * 1024;
+    if (totalSizeBytes + file.Length > maxTotalStorageBytes)
+    {
+        var usedMB = Math.Round(totalSizeBytes / (1024.0 * 1024.0), 2);
+        return Results.Json(
+            new ErrorResponse($"Insufficient storage. Used: {usedMB} MB, Limit: {options.Value.MaxTotalStorageMB} MB."),
+            statusCode: StatusCodes.Status507InsufficientStorage);
     }
 
     using var memoryStream = new MemoryStream();
@@ -125,6 +153,21 @@ app.MapGet("/api/files/{id:guid}", (Guid id, IFileStorageService storage) =>
 .WithName("DownloadFile")
 .WithSummary("Download file by ID")
 .WithDescription("Download a file by its GUID identifier. Returns the file as application/octet-stream with Content-Disposition header for automatic download.");
+
+// Delete endpoint
+app.MapDelete("/api/files/{id:guid}", (Guid id, IFileStorageService storage) =>
+{
+    var deleted = storage.Delete(id);
+    if (!deleted)
+    {
+        return Results.NotFound(new ErrorResponse("File not found."));
+    }
+
+    return Results.NoContent();
+})
+.WithName("DeleteFile")
+.WithSummary("Delete file by ID")
+.WithDescription("Delete a file by its GUID identifier. Returns 204 No Content on success, 404 if the file doesn't exist.");
 
 // Stats endpoint
 app.MapGet("/api/files/stats", (IFileStorageService storage) =>
